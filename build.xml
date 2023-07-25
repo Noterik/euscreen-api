@@ -1,0 +1,97 @@
+<?xml version="1.0" ?>
+<project name="euscreen-api" default="deploy-war">
+	<property name="project" value="euscreen-api"/>
+	<property name="src.dir" value="src"/>
+	<property name="build.dir" value="build"/>
+	<property name="dist.dir" value="dist"/>
+	<property name="doc.dir" value="doc"/>
+	<property name="lib.dir" value="WebContent/WEB-INF/lib"/>
+    <property name="classes.dir" value="target"/>
+	<property name="web.dir" value="WebContent"/>
+	<property name="war.dir" value="war"/>
+
+	<!-- create the classpath -->
+	<path id="classpath">
+		<fileset dir="${lib.dir}" includes="*.jar"/>
+	</path>
+
+	<target name="init">
+		<mkdir dir="${build.dir}" />
+		<mkdir dir="${dist.dir}" />
+		<mkdir dir="${classes.dir}" />
+		<mkdir dir="${war.dir}" />
+	</target>
+
+	<target name="clean">
+		<delete dir="${build.dir}"/>
+		<delete dir="${dist.dir}"/>
+		<delete dir="${classes.dir}" />
+		<delete dir="${war.dir}"/>
+	</target>
+
+	<target name="compile" depends="init">
+	  <javac srcdir="${src.dir}" destdir="${classes.dir}" target="1.7" source="1.7" debug="on">
+	    <classpath>
+	        <path refid="classpath"/>
+	    </classpath>
+	  </javac>
+	</target>
+
+	<target name="javadoc" depends="init">
+	  <javadoc packagenames="*" sourcepath="${src.dir}" destdir="${doc.dir}/api"
+	  	author="true"
+        version="true"
+        use="true">
+	    <classpath>
+	        <path refid="classpath"/>
+	    </classpath>
+	  </javadoc>
+	</target>
+
+	<target name="build" depends="clean,compile">
+		<delete file="${build.dir}/${project}.jar"/>
+		<jar jarfile="${build.dir}/${project}.jar" basedir="${classes.dir}"></jar>
+	</target>
+
+
+	<target name="deploy-war" depends="clean, build">
+		<copy todir="${web.dir}/WEB-INF/lib/">
+			<fileset dir="${build.dir}">
+				<include name="${project}.jar"/>
+			</fileset>
+			<fileset dir="${lib.dir}" includes="**/*.jar">
+				<exclude name="jsp-api.jar"/>
+				<exclude name="servlet.jar"/>
+			</fileset>
+		</copy>
+		<war destfile="${war.dir}/${project}.war" webxml="${web.dir}/WEB-INF/web.xml">
+			<fileset dir="${web.dir}">
+				<exclude name="WEB-INF/web.xml"/>
+				<exclude name="WEB-INF/lib/servlet.jar"/>
+				<exclude name="WEB-INF/lib/servlet-api.jar"/> 
+				<exclude name="WEB-INF/lib/javax.servlet_5.0.0.v20210105-0527.jar"/> 
+				<exclude name="WEB-INF/lib/jsp-api.jar"/>
+				<exclude name="WEB-INF/lib/mojo.jar"/>
+				<exclude name="WEB-INF/lib/log4j-1.2.16.jar"/>
+				<exclude name="WEB-INF/lib/dom4j-1.6.1.jar"/>
+				<exclude name="WEB-INF/lib/icu4j-2.6.1.jar"/>
+				<exclude name="WEB-INF/lib/jaxen-1.1.1.jar"/>
+				<exclude name="WEB-INF/lib/jdom-1.0.jar"/>
+				<exclude name="WEB-INF/lib/com.noelios.restlet.jar"/>
+				<exclude name="WEB-INF/lib/com.noelios.restlet.ext.servlet_2.4.jar"/>
+				<exclude name="WEB-INF/lib/xom-1.0.jar"/>
+				<exclude name="WEB-INF/lib/xmlParserAPIs-2.6.2.jar"/>
+				<exclude name="WEB-INF/lib/xml-apis-1.0.b2.jar"/>
+				<exclude name="WEB-INF/lib/xercesImpl-2.6.2.jar"/>
+				<exclude name="WEB-INF/lib/xml-apis-1.0.b2.jar"/>
+				<exclude name="WEB-INF/lib/xalan-2.6.0.jar"/>
+				<exclude name="WEB-INF/lib/mojo.jar"/>
+				<exclude name="WEB-INF/lib/org.osgi.core-4.0.0.jar"/>
+				<exclude name="WEB-INF/lib/org.restlet.*"/>
+				<exclude name="WEB-INF/lib/aws-java-sdk-1.11.220.jar"/>
+				<exclude name="WEB-INF/lib/metadata-extractor-2.9.1.jar"/>
+				<exclude name="WEB-INF/lib/xmpcore-5.1.2.jar.jar"/>
+			</fileset>
+		</war>
+	</target>
+</project>
