@@ -3,6 +3,7 @@ package com.noterik.euscreen;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -25,8 +26,10 @@ import org.springfield.fs.FsNode;
 public class EuscreenApi extends HttpServlet {
 
 	private static String DEFAULT_QUERY = "";
+	private static int DEFAULT_START = 1;
 	private static int MAX_RESULTS = 20;
 	private static String[] DEFAULT_TYPES = {"video", "picture"};
+	private static boolean DEFAULT_RANDOMIZE = false;
 	private static int JSON_IDENTATION = 4;
 	private static final long serialVersionUID = 1L;
 	private FSList allNodes;
@@ -35,7 +38,7 @@ public class EuscreenApi extends HttpServlet {
 	public EuscreenApi() {
         super();
         
-        System.out.println("EuscreenApi");
+        System.out.println("EUscreen api");
     }
     
     /**
@@ -44,14 +47,20 @@ public class EuscreenApi extends HttpServlet {
 	public void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 		//	First get the non filter parameters
 		String query = request.getParameter("query") == null ? DEFAULT_QUERY : request.getParameter("query");
+		int start = request.getParameter("start") == null ? DEFAULT_START : Integer.parseInt(request.getParameter("start"));
 		int maxResults = request.getParameter("limit") == null ? MAX_RESULTS : Integer.parseInt(request.getParameter("limit"));
 		String[] supportedTypes = request.getParameter("types") == null ? DEFAULT_TYPES : request.getParameter("types").split(",");
+		boolean randomize = request.getParameter("random") == null ? DEFAULT_RANDOMIZE : Boolean.parseBoolean(request.getParameter("random"));
+
+		System.out.println("EUscreen api: query = "+request.getQueryString());
 		
 		// Everything else is being applied as a filter
 		Map<String, String[]> includeFilters = new HashMap<>(request.getParameterMap());
 		includeFilters.remove("query");
+		includeFilters.remove("start");
 		includeFilters.remove("limit");
 		includeFilters.remove("types");
+		includeFilters.remove("random");
 		// If not specified, search only for public items
 		if (!includeFilters.containsKey("public")) {
 			includeFilters.put("public", new String[] {"true"});
@@ -85,37 +94,48 @@ public class EuscreenApi extends HttpServlet {
 			List<FsNode> results = allNodes.getNodesFiltered(query);
 			
 			results = applyFilters(results, includeFilters, excludeFilters);
+			System.out.println("EUscreen api: results after filtering "+results.size());
 				
-			if (results.size() > 1) {
+			if (results.size() >= 1) {
 				JSONArray jsonArray = new JSONArray();
+				int resultNr = 0;
 				int passedResults = 0;
-							
+						
+				// Randomize results if needed
+				if (randomize) {
+					Collections.shuffle(results);
+				}
+				
 				for (FsNode result : results) {
 					// Don't return more then the max results
 					if (passedResults < maxResults) {
 						// Filter on types
 						if (supportedType(result, supportedTypes)) {
-							passedResults++;
-							try {
-					            JSONObject xmlJSONObj = XML.toJSONObject(result.asXML());
-					            jsonArray.put(xmlJSONObj);
-							} catch (JSONException je) {
-					            System.out.println(je.toString());
-					            response.setStatus(500);
-					            writeResponseJSON(response, getError(500));
-					        }
+							resultNr++;
+							// Take start parameter into account
+							if (resultNr >= start) {
+								passedResults++;
+								try {
+						            JSONObject xmlJSONObj = XML.toJSONObject(result.asXML());
+						            jsonArray.put(xmlJSONObj);
+								} catch (JSONException je) {
+						            System.out.println("EUscreen api: "+je.toString());
+						            response.setStatus(500);
+						            writeResponseJSON(response, getError(500));
+						        }
+							}
 						}
 					} else {
 						break;
 					}
-				}				
+				}
 				writeResponseJSON(response, jsonArray);				
 			} else {
 				JSONObject json = new JSONObject();
 				 writeResponseJSON(response, json);
 			}
 		} else {
-			System.out.println("No nodes loaded");
+			System.out.println("EUscreen api: No nodes loaded");
             response.setStatus(500);
             writeResponseJSON(response, getError(500));
 		}
