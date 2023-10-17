@@ -21,6 +21,7 @@ import org.json.JSONException;
 
 import org.springfield.fs.FSList;
 import org.springfield.fs.FSListManager;
+import org.springfield.fs.Fs;
 import org.springfield.fs.FsNode;
 
 public class EuscreenApi extends HttpServlet {
@@ -30,6 +31,7 @@ public class EuscreenApi extends HttpServlet {
 	private static int MAX_RESULTS = 20;
 	private static String[] DEFAULT_TYPES = {"video", "picture"};
 	private static boolean DEFAULT_RANDOMIZE = false;
+	private static boolean DEFAULT_COUNT_ONLY = false;
 	private static int JSON_IDENTATION = 4;
 	private static final long serialVersionUID = 1L;
 	private FSList allNodes;
@@ -45,12 +47,15 @@ public class EuscreenApi extends HttpServlet {
 	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
 	 */
 	public void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		boolean collectionSearch = false;
+		
 		//	First get the non filter parameters
 		String query = request.getParameter("query") == null ? DEFAULT_QUERY : request.getParameter("query");
 		int start = request.getParameter("start") == null ? DEFAULT_START : Integer.parseInt(request.getParameter("start"));
 		int maxResults = request.getParameter("limit") == null ? MAX_RESULTS : Integer.parseInt(request.getParameter("limit"));
 		String[] supportedTypes = request.getParameter("types") == null ? DEFAULT_TYPES : request.getParameter("types").split(",");
 		boolean randomize = request.getParameter("random") == null ? DEFAULT_RANDOMIZE : Boolean.parseBoolean(request.getParameter("random"));
+		boolean countOnly = request.getParameter("count") == null ? DEFAULT_COUNT_ONLY : Boolean.parseBoolean(request.getParameter("count"));
 
 		System.out.println("EUscreen api: query = "+request.getQueryString());
 		
@@ -61,6 +66,7 @@ public class EuscreenApi extends HttpServlet {
 		includeFilters.remove("limit");
 		includeFilters.remove("types");
 		includeFilters.remove("random");
+		includeFilters.remove("count");
 		// If not specified, search only for public items
 		if (!includeFilters.containsKey("public")) {
 			includeFilters.put("public", new String[] {"true"});
@@ -72,17 +78,19 @@ public class EuscreenApi extends HttpServlet {
 		Map<String, String[]> excludeFilters = new HashMap<String, String[]>();
 		
 		// If not specified search entire dataset, excluding agency
-		if (!includeFilters.containsKey("collection")) {
+		if (!includeFilters.containsKey("collection")) {			
 			uri = "/domain/euscreenxl/user/*/*";
 			allNodes = FSListManager.get(uri);
 			
 			excludeFilters.put("provider", new String[] {"AGENCY"});
 		} else {
 			// Otherwise assume it's a agency search 
+			collectionSearch = true;
+			
 			String collectionName = String.join("", includeFilters.get("collection"));
 			uri = "/domain/euscreenxl/user/eu_agency/collection/"+collectionName+"/teaser";
 			
-			allNodes = FSListManager.get(uri, false);
+			allNodes = FSListManager.get(uri);
 			
 			includeFilters.remove("collection");
 		}
@@ -100,6 +108,33 @@ public class EuscreenApi extends HttpServlet {
 				JSONArray jsonArray = new JSONArray();
 				int resultNr = 0;
 				int passedResults = 0;
+				
+				if (collectionSearch) {
+					System.out.println("EUscreen api: enriching collection");
+					//get all metadata for these agency items from the original ones
+					List<FsNode> enrichedResults = new ArrayList<FsNode>();
+						
+					for (FsNode result : results) {
+						String basedOn = result.getProperty("basedon", null);
+						System.out.println("EUscreen api: basedon = "+basedOn);
+						
+						if (basedOn != null) {
+							FsNode node = Fs.getNode(basedOn);
+							
+							if (node != null) {
+								String provider = node.getProperty("provider", "AGENCY");
+								String summaryInEnglish = node.getProperty("summaryInEnglish", "");
+								System.out.println("EUscreen api: original provider = "+provider);
+								
+								result.setProperty("provider", provider);
+								result.setProperty("summaryInEnglish", summaryInEnglish);
+							}
+						}
+						enrichedResults.add(result);
+					}
+					System.out.println("EUscreen api: enrichedResults size = "+enrichedResults.size());
+					results = enrichedResults;
+				}
 						
 				// Randomize results if needed
 				if (randomize) {
@@ -108,12 +143,12 @@ public class EuscreenApi extends HttpServlet {
 				
 				for (FsNode result : results) {
 					// Don't return more then the max results
-					if (passedResults < maxResults) {
+					if (passedResults < maxResults || countOnly) {
 						// Filter on types
 						if (supportedType(result, supportedTypes)) {
 							resultNr++;
 							// Take start parameter into account
-							if (resultNr >= start) {
+							if (resultNr >= start && !countOnly) {
 								passedResults++;
 								try {
 						            JSONObject xmlJSONObj = XML.toJSONObject(result.asXML());
@@ -129,7 +164,14 @@ public class EuscreenApi extends HttpServlet {
 						break;
 					}
 				}
-				writeResponseJSON(response, jsonArray);				
+				
+				if (countOnly) {
+					JSONObject resultCount = new JSONObject();
+					resultCount.put("resultCount", resultNr);
+					writeResponseJSON(response, resultCount);
+				} else {				
+					writeResponseJSON(response, jsonArray);
+				}
 			} else {
 				JSONObject json = new JSONObject();
 				 writeResponseJSON(response, json);
