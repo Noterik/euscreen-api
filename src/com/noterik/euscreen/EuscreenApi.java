@@ -116,7 +116,6 @@ public class EuscreenApi extends HttpServlet {
 						
 					for (FsNode result : results) {
 						String basedOn = result.getProperty("basedon", null);
-						System.out.println("EUscreen api: basedon = "+basedOn);
 						
 						if (basedOn != null) {
 							FsNode node = Fs.getNode(basedOn);
@@ -124,15 +123,17 @@ public class EuscreenApi extends HttpServlet {
 							if (node != null) {
 								String provider = node.getProperty("provider", "AGENCY");
 								String summaryInEnglish = node.getProperty("summaryInEnglish", "");
-								System.out.println("EUscreen api: original provider = "+provider);
-								
+								String TitleSet_TitleSetInEnglish_title = node.getProperty("TitleSet_TitleSetInEnglish_title", "");
+								String SpatioTemporalInformation_TemporalInformation_broadcastDate = node.getProperty("SpatioTemporalInformation_TemporalInformation_broadcastDate", "");
+
 								result.setProperty("provider", provider);
 								result.setProperty("summaryInEnglish", summaryInEnglish);
+								result.setProperty("TitleSet_TitleSetInEnglish_title", TitleSet_TitleSetInEnglish_title);
+								result.setProperty("SpatioTemporalInformation_TemporalInformation_broadcastDate", SpatioTemporalInformation_TemporalInformation_broadcastDate);
 							}
 						}
 						enrichedResults.add(result);
 					}
-					System.out.println("EUscreen api: enrichedResults size = "+enrichedResults.size());
 					results = enrichedResults;
 				}
 						
